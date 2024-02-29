@@ -180,10 +180,16 @@ fig.colorbar(surf, shrink=0.5, aspect=5)
 plt.savefig('year_distance.png')
 np.savetxt('dep.txt',depths_uniform,fmt = '%15.5e',delimiter='\n')
 
-def loss_function(a,b):
+def loss_function(w):
+    a = w[:5]
+    b = w[5:]
     loss = 0.0
+    #years = np.array(years)
     for i,y in enumerate(years):
+        y = (y - years.min())/(years.max()-years.min())
         for d in distances_along_years[i]:
+            d = ((d - np.min(distances_along_years[i]))
+                /(np.max(distances_along_years[i])-np.min(distances_along_years[i])))
             f = (a[0]+a[1]*y+a[2]*y**2 + a[3]*y**3+a[4]*y**4+
             b[0] + b[1] * d + b[2] * d ** 2 + b[3] * d ** 3 + b[4] * d ** 4)
             f1 = get_depth(y,d)
@@ -194,15 +200,17 @@ import autograd.numpy as np
 from autograd import grad, jacobian
 import autograd.numpy.random as npr
 
-a = npr.randn(5)
-b = npr.randn(5)
+a = npr.randn(10)
+
+years = np.array(years)
+lf = loss_function(a)
 
 lmb = 0.01
 for i in range(100):
-    lf = loss_function(a,b)
-    loss_grad = grad(loss_function)(a,b)
-    a = a - lmb * loss_grad[0]
-    b = b - lmb * loss_grad[1]
+    lf = loss_function(a)
+    loss_grad = grad(loss_function)(a)
+    a = a - lmb * loss_grad
+    # b = b - lmb * loss_grad[1]
     print('iter ',i,lf)
 
 qq = 0
