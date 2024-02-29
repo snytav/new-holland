@@ -130,6 +130,7 @@ def get_depth(y,m):
 
 
 t = get_depth_exact_match(1968,45)
+t = get_depth_exact_match(1968,4500)
 print(t)
 t = get_depth(1968,45)
 print(t)
@@ -169,7 +170,7 @@ np.savetxt('dist_unif.txt',distances_uniform[0],fmt='%15.5e',delimiter='\n')
 from matplotlib import cm
 fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 
-# X,Y = np.meshgrid(num_years,distances_uniform[0])
+X,Y = np.meshgrid(num_years,distances_uniform[0])
 
 surf = ax.plot_surface(X, Y, depths_uniform.T, cmap=cm.coolwarm,
                        linewidth=0, antialiased=False)
@@ -178,4 +179,31 @@ ax.set_ylabel('DISTANCE')
 fig.colorbar(surf, shrink=0.5, aspect=5)
 plt.savefig('year_distance.png')
 np.savetxt('dep.txt',depths_uniform,fmt = '%15.5e',delimiter='\n')
+
+def loss_function(a,b):
+    loss = 0.0
+    for i,y in enumerate(years):
+        for d in distances_along_years[i]:
+            f = (a[0]+a[1]*y+a[2]*y**2 + a[3]*y**3+a[4]*y**4+
+            b[0] + b[1] * d + b[2] * d ** 2 + b[3] * d ** 3 + b[4] * d ** 4)
+            f1 = get_depth(y,d)
+            loss += (f - f1)**2
+    return loss
+
+import autograd.numpy as np
+from autograd import grad, jacobian
+import autograd.numpy.random as npr
+
+a = npr.randn(5)
+b = npr.randn(5)
+
+lmb = 0.01
+for i in range(100):
+    lf = loss_function(a,b)
+    loss_grad = grad(loss_function)(a,b)
+    a = a - lmb * loss_grad[0]
+    b = b - lmb * loss_grad[1]
+    print('iter ',i,lf)
+
+qq = 0
 
