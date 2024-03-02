@@ -216,11 +216,11 @@ hist = []
 
 
 w.requires_grad = True
-optimizer = torch.optim.Adam([w],lr=0.1)
+optimizer = torch.optim.Adam([w], lr=0.1, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
 #print('w0 ',w)
 n=0
 lf = 1e6
-while lf > 1e1:
+while lf > 5e2:
     optimizer.zero_grad()
     lf = loss_function(w,dep3)
     lf.backward()
@@ -299,5 +299,5 @@ mae = mean_squared_error(dep3.numpy(),poly_dep3.detach().numpy())
 
 mape = mean_absolute_percentage_error(dep3.numpy(),poly_dep3.detach().numpy())
 print(mae,mape)
-np.savetxt('coefs.txt',w.numpy())
+np.savetxt('coefs.txt',w.detach().numpy())
 qq = 0
