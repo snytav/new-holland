@@ -16,15 +16,7 @@ import seaborn as sns
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 sns.set()
 
-from google.colab import drive
-drive.mount('/content/drive')
 
-import os
-from glob import glob
-os.chdir("/content/drive/MyDrive/Ameland")
-for file in glob("*"):
-
-    print(file)
 
 f = open("Depth_12.dat","rt")
 
@@ -40,6 +32,7 @@ depth_along_years = []
 years = []
 distances_along_years = []
 
+plt.figure(figsize=(800,600))
 number =0
 s = ''.join(lines)
 years_list = s.split('}}')     # splitting along years
@@ -78,7 +71,7 @@ for y in years_list:
 plt.xlabel('cross-shore distance')
 plt.ylabel('depth')
 plt.title('Coast profile')
-
+plt.savefig('profiles_along_all_years.png')
 def get_distance_cell_and_factor(d0,dist):
     i = 0
     f = 0.0
@@ -117,7 +110,7 @@ d = depth(y,m,years,distances_along_years,depth_along_years)
 print(d)
 
 #limit all the variable to 3 to build the minimizer
-NL = 20
+NL = 30
 y3 = years[:NL]
 dis3 = []
 for d in distances_along_years[:NL]:
@@ -225,15 +218,17 @@ hist = []
 w.requires_grad = True
 optimizer = torch.optim.Adam([w],lr=0.1)
 #print('w0 ',w)
-for n in range(1000):
+n=0
+lf = 1e6
+while lf > 1e1:
     optimizer.zero_grad()
     lf = loss_function(w,dep3)
     lf.backward()
-    print(n,lf.item(),w.grad)
+    print(n,lf.item())
     hist.append(lf.item())
    #print('lf1  ',n,lf.item())
     optimizer.step()
-
+    n= n + 1
 #gd = grad(loss_function)(w,dep3)
 #w = np.array(w)
 #gd = np.array(gd)
@@ -244,9 +239,11 @@ for n in range(1000):
 #print('lf2 ',lf2)
 
 hist = np.array(hist)
+plt.figure()
 plt.plot(hist)
 plt.xlabel('number of iteration')
 plt.ylabel('Loss function')
+plt.plot('loss_vs_epoch.png')
 
 
 
@@ -277,6 +274,7 @@ ax.set_xlabel('years')
 ax.set_ylabel('distance,m')
 plt.colorbar(surf)
 plt.title('Real Depth  Data')
+plt.savefig('real_depth.png')
 
 poly_dep3 = polynom(w,dep3)
 
@@ -294,9 +292,12 @@ ax.set_xlabel('years')
 ax.set_ylabel('distance,m')
 plt.colorbar(surf)
 plt.title('Polynom Approximation of Real Depth  Data')
+plt.savefig('polynom_depth.png')
 
 from sklearn.metrics import mean_squared_error,mean_absolute_percentage_error
 mae = mean_squared_error(dep3.numpy(),poly_dep3.detach().numpy())
 
 mape = mean_absolute_percentage_error(dep3.numpy(),poly_dep3.detach().numpy())
 print(mae,mape)
+np.savetxt('coefs.txt',w.numpy())
+qq = 0
