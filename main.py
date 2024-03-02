@@ -9,22 +9,22 @@ Original file is located at
 
 import math
 import pandas as pd
-import numpy as np
+import autograd.numpy as np
 import matplotlib.pyplot as plt
 import datetime as dt
 import seaborn as sns
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 sns.set()
 
-# from google.colab import drive
-# drive.mount('/content/drive')
-#
-# import os
-# from glob import glob
-# os.chdir("/content/drive/MyDrive/Ameland")
-# for file in glob("*"):
-#
-#     print(file)
+from google.colab import drive
+drive.mount('/content/drive')
+
+import os
+from glob import glob
+os.chdir("/content/drive/MyDrive/Ameland")
+for file in glob("*"):
+
+    print(file)
 
 f = open("Depth_12.dat","rt")
 
@@ -68,7 +68,7 @@ for y in years_list:
     distances_along_years.append(evens_numbers)
     print('distances_along_years ',distances_along_years)
     plt.plot(np.array(evens_numbers), np.array(odds_numbers), label=str(year), color=colors[number % len(colors)])
-    plt.title(str(year))
+    plt.title(str(year)+' Nx = '+str(len(evens_numbers)))
     plt.show()
 
     plt.legend(loc='best')
@@ -91,127 +91,212 @@ def get_distance_cell_and_factor(d0,dist):
               break
     return i,f
 
+import autograd.numpy as np
+#from autograd import grad, ja
 years = [int(y) for y in years]
 years = np.array(years)
-i,f = get_distance_cell_and_factor(1968.5,years)
-print(i,f)
 
-distances_along_years[0]
+# find depth by year y and distance m
+def depth(y,m,yrs,dis,dep):
+  # print(years[:5])
+  i = np.where(yrs == y)
+  i = i[0][0]
+  print(i)
+  dis = dis[i]
+  dis = np.array(dis)
+  print(type(dis),dis)
+  j = np.where(dis == m)
+  j = j[0][0]
+  print(j)
+  d = dep[i][j]
+  return d
 
-i,f = get_distance_cell_and_factor(45,distances_along_years[0])
-print(i,f)
+y = 1968
+m = 40
+d = depth(y,m,years,distances_along_years,depth_along_years)
+print(d)
 
-def interpolate(dep,i,f):
-    t = dep[i]*(1.0-f)+dep[i+1]*f
-    return t
+#limit all the variable to 3 to build the minimizer
+NL = 20
+y3 = years[:NL]
+dis3 = []
+for d in distances_along_years[:NL]:
+    print(d)
+    d = d[:NL]
+    print(d)
+    dis3.append(d)
 
-years = [int(y) for y in years] # years.astype(int)
-#years
+dep3 = []
+for d in depth_along_years[:NL]:
+    print(d)
+    d = d[:NL]
+    print(d)
+    dep3.append(d)
 
-#depth_along_years
+print(y3)
+print(dis3)
+print(dep3)
 
-def get_depth_exact_match(yt,m):
-    for y,dis,dep in zip(years,distances_along_years,depth_along_years):
-       #print(str(y),yt,dis,dep)
-       if y == yt:
-          #print(y,dis,dep)
-          i,f = get_distance_cell_and_factor(m,dis)
-          break
-    t = interpolate(dep,i,f)
-    return t
-
-def get_depth(y,m):
-    i_y, f_y = get_distance_cell_and_factor(y,years)
-    d1 = get_depth_exact_match(years[i_y], m)
-    d2 = get_depth_exact_match(years[i_y+1], m)
-    dd = np.array([d1,d2])
-    t = interpolate(dd, 0, f_y)
-    return t
+import autograd.numpy.random as npr
 
 
-t = get_depth_exact_match(1968,45)
-t = get_depth_exact_match(1968,4500)
-print(t)
-t = get_depth(1968,45)
-print(t)
+# random numbers list with the structure matching depth
+w = []
+for y in dep3:
+    ws = []
+    for m in y:
+        t = npr.randn(1)
+        #print(t)
+        t = t[0]
+        ws.append(t)
+    w.append(ws)
+W = w
+
+W
+
+# subtract two fancy list structures
+def minus(W,dep3,tw,td):
+    res = []
+    loss = 0.0
+    for y,ws in zip(dep3,W):
+        res1 = []
+        for m,w in zip(y,ws):
+            res1.append(tw*m-td*w)
+        res.append(res1)
+    return res
+
+w1 = minus(W,W,1.0,0.0)
+w1
+
+import torch
+#loss function
+def loss_function(W,dep3):
+    loss = 0.0
+   # dep3 = np.array(dep3)
+    for i,dep1d in enumerate(dep3):
+        for j,y in enumerate(dep1d):
+            xc = float(i)/dep3.shape[0]
+            yc = float(j)/dep3.shape[1]
+            w = W
+            m_poly =( w[0] + w[1]*xc+w[2]*xc**2+w[3]*xc**3+w[4]*xc**4+
+                      +w[5] +w[6]*yc+w[7]*yc**2+w[8]*yc**3+w[9]*yc**4
+                      )
+            #print(i,j,xc,yc,m_poly.item())
+            m = dep3[i][j]
+            loss += (m-m_poly)**2
+            #print(i,j,xc,yc,m_poly.item(),loss.item())
+    return loss
+
+dep3 = np.array(dep3)
+dep3 = torch.from_numpy(dep3)
+W = torch.randn(10)
+loss = loss_function(W,dep3)
+
+print('loss ',loss)
+
+def polynom(W,dep3):
+    loss = 0.0
+    # dep3 = np.array(dep3)
+    poly_func = torch.zeros_like(dep3)
+
+    for i,dep1d in enumerate(dep3):
+        for j,y in enumerate(dep1d):
+            xc = float(i)/dep3.shape[0]
+            yc = float(j)/dep3.shape[1]
+            w = W
+            poly_func[i][j] =( w[0] + w[1]*xc+w[2]*xc**2+w[3]*xc**3+w[4]*xc**4+
+                      +w[5] +w[6]*yc+w[7]*yc**2+w[8]*yc**3+w[9]*yc**4
+                      )
+            #print(i,j,xc,yc,m_poly.item())
+            # m = dep3[i][j]
+            # loss += (m-m_poly)**2
+            #print(i,j,xc,yc,m_poly.item(),loss.item())
+    return poly_func
+
+import torch
+
+def f(z,x):
+    return x*2+z**3
+lmb = 0.1
+w = torch.randn(10)
+hist = []
 
 
-i,f = get_distance_cell_and_factor(1966,years)
-#years
-print(i,f)
+w.requires_grad = True
+optimizer = torch.optim.Adam([w],lr=0.1)
+#print('w0 ',w)
+for n in range(1000):
+    optimizer.zero_grad()
+    lf = loss_function(w,dep3)
+    lf.backward()
+    print(n,lf.item(),w.grad)
+    hist.append(lf.item())
+   #print('lf1  ',n,lf.item())
+    optimizer.step()
+
+#gd = grad(loss_function)(w,dep3)
+#w = np.array(w)
+#gd = np.array(gd)
+#print('gd ',gd)
+#w = w - lmb*gd
+#print(w)
+#lf2 = loss_function(w,dep3)
+#print('lf2 ',lf2)
+
+hist = np.array(hist)
+plt.plot(hist)
+plt.xlabel('number of iteration')
+plt.ylabel('Loss function')
+
+
 
 for d in depth_along_years:
     print(len(d),d)
 
-import numpy as np
-cmap = plt.get_cmap('gnuplot')
+xtic = y3
+dis3 = np.array(dis3)
+ytic = dis3[1,:]
+print('xtic ',xtic)
+ytic
 
-qq = 0
-dep = np.array(depth_along_years)
-dis = np.array(distances_along_years)
-qq = 0
+X,Y = np.meshgrid(xtic,ytic)
 
+from matplotlib import pyplot as plt
+from matplotlib import pyplot, cm
+from mpl_toolkits.mplot3d import Axes3D
 
-lens = np.array([len(s) for s in dis])
-observations = lens.min()
-depths_uniform    = np.zeros((len(years),observations))
-distances_uniform = np.zeros((len(years),observations))
-for i in range(len(years)):
-    for j in range(observations):
-        depths_uniform[i][j]    = dep[i][j]
-        distances_uniform[i][j] = dis[i][j]
-
-num_years = [float(y) for y in years]
-X,Y = np.meshgrid(num_years,distances_uniform[0])
-
-np.savetxt('num_years.txt',num_years,fmt='%15.5e',delimiter='\n')
-np.savetxt('dist_unif.txt',distances_uniform[0],fmt='%15.5e',delimiter='\n')
-
-from matplotlib import cm
 fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+#X, Y = np.meshgrid(x_space, y_space)
+surf = ax.plot_surface(X, Y, dep3.numpy(), rstride=1, cstride=1,
+cmap=cm.coolwarm,
+linewidth=0, antialiased=False)
+#ax.set_xlim(0, 1)
+#ax.set_ylim(0, 1)
+#ax.set_zlim(0, 2)
+ax.set_xlabel('years')
+ax.set_ylabel('distance,m')
+plt.colorbar(surf)
+plt.title('Real Depth  Data')
 
-X,Y = np.meshgrid(num_years,distances_uniform[0])
+poly_dep3 = polynom(w,dep3)
 
-surf = ax.plot_surface(X, Y, depths_uniform.T, cmap=cm.coolwarm,
-                       linewidth=0, antialiased=False)
-ax.set_xlabel('YEAR')
-ax.set_ylabel('DISTANCE')
-fig.colorbar(surf, shrink=0.5, aspect=5)
-plt.savefig('year_distance.png')
-np.savetxt('dep.txt',depths_uniform,fmt = '%15.5e',delimiter='\n')
 
-def loss_function(w):
-    a = w[:5]
-    b = w[5:]
-    loss = 0.0
-    #years = np.array(years)
-    for i,y in enumerate(years):
-        y = (y - years.min())/(years.max()-years.min())
-        for d in distances_along_years[i]:
-            d = ((d - np.min(distances_along_years[i]))
-                /(np.max(distances_along_years[i])-np.min(distances_along_years[i])))
-            f = (a[0]+a[1]*y+a[2]*y**2 + a[3]*y**3+a[4]*y**4+
-            b[0] + b[1] * d + b[2] * d ** 2 + b[3] * d ** 3 + b[4] * d ** 4)
-            f1 = get_depth(y,d)
-            loss += (f - f1)**2
-    return loss
 
-import autograd.numpy as np
-from autograd import grad, jacobian
-import autograd.numpy.random as npr
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+#X, Y = np.meshgrid(x_space, y_space)
+surf = ax.plot_surface(X, Y, poly_dep3.detach().numpy(), rstride=1, cstride=1,
+cmap=cm.coolwarm,
+linewidth=0, antialiased=False)
+#ax.set_xlim(0, 1)
+#ax.set_ylim(0, 1)
+#ax.set_zlim(0, 2)
+ax.set_xlabel('years')
+ax.set_ylabel('distance,m')
+plt.colorbar(surf)
+plt.title('Polynom Approximation of Real Depth  Data')
 
-a = npr.randn(10)
+from sklearn.metrics import mean_squared_error,mean_absolute_percentage_error
+mae = mean_squared_error(dep3.numpy(),poly_dep3.detach().numpy())
 
-years = np.array(years)
-lf = loss_function(a)
-
-lmb = 0.01
-for i in range(100):
-    lf = loss_function(a)
-    loss_grad = grad(loss_function)(a)
-    a = a - lmb * loss_grad
-    # b = b - lmb * loss_grad[1]
-    print('iter ',i,lf)
-
-qq = 0
-
+mape = mean_absolute_percentage_error(dep3.numpy(),poly_dep3.detach().numpy())
+print(mae,mape)
